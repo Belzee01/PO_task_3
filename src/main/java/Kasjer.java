@@ -44,9 +44,46 @@ public class Kasjer {
                 }
             }
         }
-
+        try {
+            wynikPracy.addAll(evaluateDenomination(kwotaDoZaplaty * (-1)));
+        } catch (NoRestException e) {
+            return pieniadze;
+        }
 
         return wynikPracy;
+    }
+
+    private List<NZlotowka> evaluateDenomination(int cost) throws NoRestException {
+        List<NZlotowka> money = new ArrayList<>();
+        int rest = cost;
+        for (Integer d : DENOMINATIONS) {
+            int size = (rest / d);
+            if (size > 0) {
+                try {
+                    money.addAll(createMoneyWithDenomination(size, d));
+                    rest = rest % d;
+
+                } catch (DenominationException ignored) {
+                }
+            }
+            if (rest == 0)
+                break;
+        }
+        if (rest > 0)
+            throw new NoRestException("No suitable denomination in cash registry to give the rest");
+        return money;
+    }
+
+    private List<NZlotowka> createMoneyWithDenomination(int size, int denomination) throws DenominationException {
+        List<NZlotowka> zlotowkas = new ArrayList<>();
+        for (int i = 0; i < size; i++) {
+            NZlotowka possibleRest = this.cashRegister.stream().filter(n -> n.getWartosc() == denomination)
+                    .findFirst()
+                    .orElseThrow(() -> new DenominationException("No denomination in cash registry"));
+            zlotowkas.add(possibleRest);
+            this.cashRegister.remove(possibleRest);
+        }
+        return zlotowkas;
     }
 
 
@@ -94,6 +131,18 @@ public class Kasjer {
                     change++;
                 }
             }
+        }
+    }
+
+    public static class DenominationException  extends Exception {
+        public DenominationException(String message) {
+            super(message);
+        }
+    }
+
+    public static class NoRestException extends Exception {
+        public NoRestException(String message) {
+            super(message);
         }
     }
 }
