@@ -60,7 +60,7 @@ public class Kasjer {
             int size = (rest / d);
             if (size > 0) {
                 try {
-                    money.addAll(createMoneyWithDenomination(size, d));
+                    rest = createMoneyWithDenomination(money, rest, size, d);
                     rest = rest % d;
 
                 } catch (DenominationException ignored) {
@@ -74,16 +74,17 @@ public class Kasjer {
         return money;
     }
 
-    private List<NZlotowka> createMoneyWithDenomination(int size, int denomination) throws DenominationException {
-        List<NZlotowka> zlotowkas = new ArrayList<>();
+    private int createMoneyWithDenomination(List<NZlotowka> zlotowkas, int rest, int size, int denomination) throws DenominationException {
+        int currentRest = rest;
         for (int i = 0; i < size; i++) {
             NZlotowka possibleRest = this.cashRegister.stream().filter(n -> n.getWartosc() == denomination)
                     .findFirst()
                     .orElseThrow(() -> new DenominationException("No denomination in cash registry"));
             zlotowkas.add(possibleRest);
             this.cashRegister.remove(possibleRest);
+            currentRest = currentRest - denomination;
         }
-        return zlotowkas;
+        return currentRest;
     }
 
 
@@ -134,7 +135,7 @@ public class Kasjer {
         }
     }
 
-    public static class DenominationException  extends Exception {
+    public static class DenominationException extends Exception {
         public DenominationException(String message) {
             super(message);
         }
