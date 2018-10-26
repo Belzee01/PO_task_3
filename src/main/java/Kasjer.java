@@ -1,5 +1,9 @@
-import java.util.*;
-import java.util.function.Function;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class Kasjer {
@@ -59,11 +63,14 @@ public class Kasjer {
         for (Integer d : DENOMINATIONS) {
             int size = (rest / d);
             if (size > 0) {
-                try {
-                    rest = createMoneyWithDenomination(money, rest, size, d);
-                    rest = rest % d;
-
-                } catch (DenominationException ignored) {
+                for (int i = 0; i < size; i++) {
+                    Optional<NZlotowka> possibleRest = this.cashRegister.stream().filter(n -> n.getWartosc() == d)
+                            .findFirst();
+                    if (possibleRest.isPresent()) {
+                        money.add(possibleRest.get());
+                        this.cashRegister.remove(possibleRest.get());
+                        rest = rest - d;
+                    }
                 }
             }
             if (rest == 0)
@@ -73,20 +80,6 @@ public class Kasjer {
             throw new NoRestException("No suitable denomination in cash registry to give the rest");
         return money;
     }
-
-    private int createMoneyWithDenomination(List<NZlotowka> zlotowkas, int rest, int size, int denomination) throws DenominationException {
-        int currentRest = rest;
-        for (int i = 0; i < size; i++) {
-            NZlotowka possibleRest = this.cashRegister.stream().filter(n -> n.getWartosc() == denomination)
-                    .findFirst()
-                    .orElseThrow(() -> new DenominationException("No denomination in cash registry"));
-            zlotowkas.add(possibleRest);
-            this.cashRegister.remove(possibleRest);
-            currentRest = currentRest - denomination;
-        }
-        return currentRest;
-    }
-
 
     /**
      * Metoda zwraca stan kasy sklepowej czyli, lista wszystkich obietkĂłw NZlotowka,
