@@ -1,5 +1,4 @@
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +27,7 @@ public class Kasjer {
             return pieniadze;
 
         List<NZlotowka> wynikPracy = new ArrayList<>();
+        List<NZlotowka> moneyToBeAddedToCashRegistry = new ArrayList<>();
 
         List<NZlotowka> unchangeable = pieniadze.stream().filter(NZlotowka::isZlotowkaNierozmienialna).collect(Collectors.toList());
         List<NZlotowka> normal = pieniadze.stream().filter(m -> !m.isZlotowkaNierozmienialna()).collect(Collectors.toList());
@@ -38,11 +38,13 @@ public class Kasjer {
         for (int i = unchangeable.size() - 1; i >= 0; i--) { // try to take as much of unchangeable coins as possible
             if (kwotaDoZaplaty >= unchangeable.get(i).getWartosc()) {
                 kwotaDoZaplaty = kwotaDoZaplaty - unchangeable.get(i).getWartosc();
+                moneyToBeAddedToCashRegistry.add(unchangeable.get(i));
             }
         }
 
         for (int i = normal.size() - 1; i >= 0; i--) { // try to take as much of changeable coins as possible
             kwotaDoZaplaty = kwotaDoZaplaty - normal.get(i).getWartosc();
+            moneyToBeAddedToCashRegistry.add(normal.get(i));
             if (kwotaDoZaplaty <= 0)
                 break;
         }
@@ -62,14 +64,17 @@ public class Kasjer {
         int cashRegisterSum = getSumOfCashRegister();
         if (cashRegisterSum < rest) // check whether there is enough money in cash register
             return pieniadze;
-        else if (cashRegisterSum == rest) // if cash register has the equal amount of money as that we want to return, then return all
+        else if (cashRegisterSum == rest) {// if cash register has the equal amount of money as that we want to return, then return all
             wynikPracy.addAll(this.cashRegister);
-        else { // if there is more than we want to return, then we have to check if it possible to return the rest
+            this.cashRegister.addAll(pieniadze);
+        } else { // if there is more than we want to return, then we have to check if it possible to return the rest
             try {
                 wynikPracy.addAll(evaluateDenomination(rest));
+                this.cashRegister.addAll(moneyToBeAddedToCashRegistry);
             } catch (NoRestException e) {
                 return pieniadze;
             } finally {
+                moneyToBeAddedToCashRegistry.clear();
                 stack.removeAllElements();
             }
         }
@@ -81,7 +86,7 @@ public class Kasjer {
         return this.cashRegister.stream().mapToInt(NZlotowka::getWartosc).sum();
     }
 
-    public List<NZlotowka> evaluateDenomination(int cost) throws NoRestException {
+    private List<NZlotowka> evaluateDenomination(int cost) throws NoRestException {
         checkIfItIsPossibleToGetTheRest(cost, this.cashRegister);
         if (stack.empty())
             throw new NoRestException("No suitable denomination in cash registry to give the rest");
@@ -103,7 +108,7 @@ public class Kasjer {
                 stack.push(temp);
                 return true;
             }
-            currentCash.add(temp);
+            currentCash.add(i, temp);
         }
 
         return false;
