@@ -3,14 +3,23 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Stack;
 import java.util.stream.Collectors;
 
 public class Kasjer {
 
-    private static final List<Integer> DENOMINATIONS = Arrays.asList(500, 200, 100, 50, 20, 10, 5, 2, 1);
+    private List<NZlotowka> cashRegister;
+    private Stack<NZlotowka> stack;
 
-    private List<NZlotowka> cashRegister = new ArrayList<>();
+    public Kasjer() {
+        this.cashRegister = new ArrayList<>();
+        this.stack = new Stack<>();
+    }
+
+    public Kasjer(List<NZlotowka> cashRegister) {
+        this.cashRegister = cashRegister;
+        this.stack = new Stack<>();
+    }
 
     public Collection<NZlotowka> kup(Collection<NZlotowka> pieniadze, int kwotaDoZaplaty) {
 
@@ -26,92 +35,90 @@ public class Kasjer {
         sort(unchangeable);
         sort(normal);
 
-        for (int i = unchangeable.size() - 1; i >= 0; i--) {
+        for (int i = unchangeable.size() - 1; i >= 0; i--) { // try to take as much of unchangeable coins as possible
             if (kwotaDoZaplaty >= unchangeable.get(i).getWartosc()) {
                 kwotaDoZaplaty = kwotaDoZaplaty - unchangeable.get(i).getWartosc();
             }
         }
 
-        for (int i = normal.size() - 1; i >= 0; i--) {
+        for (int i = normal.size() - 1; i >= 0; i--) { // try to take as much of changeable coins as possible
             kwotaDoZaplaty = kwotaDoZaplaty - normal.get(i).getWartosc();
             if (kwotaDoZaplaty <= 0)
                 break;
         }
 
-        if (kwotaDoZaplaty > 0) {
+        if (kwotaDoZaplaty > 0) { // if there is still not enough money, then try to take another unchangeable coins
             for (NZlotowka anUnchangeable : unchangeable) {
                 kwotaDoZaplaty = kwotaDoZaplaty - anUnchangeable.getWartosc();
 
-                if (kwotaDoZaplaty <= 0) {
+                if (kwotaDoZaplaty < 0) {
                     wynikPracy.add(anUnchangeable);
                     break;
                 }
             }
         }
-        try {
-            wynikPracy.addAll(evaluateDenomination(kwotaDoZaplaty * (-1)));
-        } catch (NoRestException e) {
+
+        int rest = kwotaDoZaplaty * (-1);
+        int cashRegisterSum = getSumOfCashRegister();
+        if (cashRegisterSum < rest) // check whether there is enough money in cash register
             return pieniadze;
+        else if (cashRegisterSum == rest) // if cash register has the equal amount of money as that we want to return, then return all
+            wynikPracy.addAll(this.cashRegister);
+        else { // if there is more than we want to return, then we have to check if it possible to return the rest
+            try {
+                wynikPracy.addAll(evaluateDenomination(rest));
+            } catch (NoRestException e) {
+                return pieniadze;
+            } finally {
+                stack.removeAllElements();
+            }
         }
 
         return wynikPracy;
     }
 
-    private List<NZlotowka> evaluateDenomination(int cost) throws NoRestException {
-        List<NZlotowka> money = new ArrayList<>();
-        int rest = cost;
-        for (Integer d : DENOMINATIONS) {
-            int size = (rest / d);
-            if (size > 0) {
-                for (int i = 0; i < size; i++) {
-                    Optional<NZlotowka> possibleRest = this.cashRegister.stream().filter(n -> n.getWartosc() == d)
-                            .findFirst();
-                    if (possibleRest.isPresent()) {
-                        money.add(possibleRest.get());
-                        this.cashRegister.remove(possibleRest.get());
-                        rest = rest - d;
-                    }
-                }
-            }
-            if (rest == 0)
-                break;
-        }
-        if (rest > 0)
-            throw new NoRestException("No suitable denomination in cash registry to give the rest");
-        return money;
+    private int getSumOfCashRegister() {
+        return this.cashRegister.stream().mapToInt(NZlotowka::getWartosc).sum();
     }
 
-    /**
-     * Metoda zwraca stan kasy sklepowej czyli, lista wszystkich obietkĂłw NZlotowka,
-     * ktĂłre od poczÄtku pracy kasjera wpĹynÄĹy za zakupy a nie zostaĹy przekazane
-     * klientowi (jako reszta za zakupy i nierozmienialne NZlotowki stracone z
-     * powodu koniecznoĹci ich rozmiany).
-     *
-     * @return aktualny stan gotĂłwki w kasie.
-     */
+    public List<NZlotowka> evaluateDenomination(int cost) throws NoRestException {
+        checkIfItIsPossibleToGetTheRest(cost, this.cashRegister);
+        if (stack.empty())
+            throw new NoRestException("No suitable denomination in cash registry to give the rest");
+        return new ArrayList<>(stack);
+    }
+
+    private boolean checkIfItIsPossibleToGetTheRest(int rest, List<NZlotowka> currentCash) {
+        if (rest == 0)
+            return true;
+
+        if (rest < 0)
+            return false;
+
+        for (int i = 0; i < currentCash.size(); i++) {
+            NZlotowka temp = currentCash.get(i);
+            currentCash.remove(i);
+            boolean found = checkIfItIsPossibleToGetTheRest(rest - temp.getWartosc(), currentCash);
+            if (found) {
+                stack.push(temp);
+                return true;
+            }
+            currentCash.add(temp);
+        }
+
+        return false;
+    }
+
+
     public List<NZlotowka> stanKasy() {
         return this.cashRegister;
     }
 
-    /**
-     * Metoda zwraca mapÄ, ktĂłrej kluczem jest NZĹotowka a wartoĹcia liczba takich
-     * samych NZĹotĂłwek w kasie (porĂłwnujÄc uwzglÄdniamy wyĹÄcznie nominaĹ oraz
-     * flagÄ nierozmienialnoĹci). PrzykĹadowo jeĹli w kasie znajdujÄ siÄ: 10zĹ,
-     * 20zĹ, 10zĹ, 10zĹNierozmienialne, 1zĹ, 20zĹ, 10zĹ to wynikiem jest:
-     *
-     * <pre>
-     * 10zĹ -&gt; 3
-     * 20zĹ -&gt; 2
-     * 10zĹNierozmienialne -&gt; 1
-     * 1zĹ -&gt; 1
-     * </pre>
-     *
-     * @return mapa zawierajÄca informacjÄ o iloĹci rĂłĹźnych rodzajĂłw NZĹotĂłwek.
-     */
     public Map<NZlotowka, Integer> ileCzegoMamy() {
         return this.cashRegister.stream().collect(Collectors.toMap(n -> n, n -> 1, Integer::sum)); //przeciez nie bede zliczal jak zwierze
     }
 
+    //bubble sort
     private static void sort(List<NZlotowka> nZlotowkas) {
         NZlotowka temp;
         int change = 1;
@@ -128,12 +135,11 @@ public class Kasjer {
         }
     }
 
-    public static class DenominationException extends Exception {
-        public DenominationException(String message) {
-            super(message);
-        }
+    private List<Integer> getCurrentDenominations() {
+        return this.ileCzegoMamy().entrySet().stream().mapToInt(e -> e.getKey().getWartosc()).boxed().collect(Collectors.toList());
     }
 
+    //Exception thrown when it is not possible to produce the rest
     public static class NoRestException extends Exception {
         public NoRestException(String message) {
             super(message);
