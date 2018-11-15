@@ -61,6 +61,10 @@ public class Kasjer {
         }
 
         int rest = kwotaDoZaplaty * (-1);
+        if (rest == 0) {
+            this.cashRegister.addAll(moneyToBeAddedToCashRegistry);
+            return wynikPracy;
+        }
         int cashRegisterSum = getSumOfCashRegister();
         if (cashRegisterSum < rest) // check whether there is enough money in cash register
             return pieniadze;
@@ -138,10 +142,6 @@ public class Kasjer {
                 }
             }
         }
-    }
-
-    private List<Integer> getCurrentDenominations() {
-        return this.ileCzegoMamy().entrySet().stream().mapToInt(e -> e.getKey().getWartosc()).boxed().collect(Collectors.toList());
     }
 
     //Exception thrown when it is not possible to produce the rest
